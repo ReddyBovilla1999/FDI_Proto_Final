@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coding Assessment Creation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1d2686;
+            --bg-color-page: #f9fafc;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color-page);
+        }
+        .content-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Aligns content to the top */
+            min-height: calc(100vh - 120px); /* Adjusted for taller header */
+            padding: 8rem 2rem 2rem 2rem; /* Increased top padding */
+            text-align: center;
+        }
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+        .breadcrumb-item {
+            color: #6b7280; /* text-gray-500 */
+        }
+        .breadcrumb-item.active {
+            color: #1f2937; /* text-gray-800 */
+            font-weight: 700;
+        }
+
+        .profile-menu-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 6px; /* Reduced gap */
+            cursor: pointer;
+            color: #fff;
+            font-weight: bold;
+        }
+ 
+        /* Profile avatar (the 'S' circle) */
+        .profile-avatar {
+            width: 28px; /* Reduced size */
+            height: 28px; /* Reduced size */
+            border-radius: 50%;
+            background-color: #e0e0e0;
+            color: #1d2686;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px; /* Reduced font size */
+            text-transform: uppercase;
+        }
+ 
+        /* Styles for the new question mark icon next to 'S' */
+        .profile-help-icon {
+            color: #fff; /* White color for the question mark icon */
+            font-size: 20px; /* Increased font size for visual weight to match 'S' visually */
+            width: 28px; /* Matched width with .profile-avatar */
+            height: 28px; /* Matched height with .profile-avatar */
+            border-radius: 6px; /* Slightly rounded corners for the square */
+            display: flex; /* Use flex to center the icon */
+            justify-content: center; /* Center horizontally */
+            align-items: center; /* Center vertically */
+            margin-left: 10px; /* Space it out from the profile avatar/dropdown */
+            cursor: pointer; /* Indicate it's clickable */
+        }
+ 
+        /* Profile dropdown menu */
+        .profile-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background-color: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+            overflow: hidden;
+            min-width: 200px; /* Slightly reduced width */
+            display: none;
+            z-index: 100;
+            margin-top: 8px; /* Reduced gap */
+            font-family: 'Inter', sans-serif;
+        }
+ 
+        .profile-dropdown.show {
+            display: block;
+        }
+ 
+        /* Header within the dropdown (Sri, email, company) */
+        .profile-dropdown-header {
+            padding: 8px 12px; /* Reduced padding */
+            background-color: #f0f2f5;
+            border-bottom: 1px solid #eee;
+            font-weight: 600;
+            color: #333;
+        }
+ 
+        .profile-dropdown-header span {
+            font-size: 14px; /* Reduced font size */
+        }
+ 
+        .profile-dropdown-header small {
+            color: #666;
+            font-weight: 400;
+            font-size: 11px; /* Reduced font size */
+        }
+ 
+        /* Individual items in the dropdown menu */
+        .profile-dropdown-item {
+            padding: 8px 12px; /* Reduced padding */
+            display: flex;
+            align-items: center;
+            gap: 8px; /* Reduced gap */
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            font-size: 12px; /* Reduced font size */
+            transition: background-color 0.2s;
+        }
+ 
+        .profile-dropdown-item:hover {
+            background-color: #f5f5f5;
+        }
+ 
+        .profile-dropdown-item i {
+            color: #1d2686;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="sticky-header">
+        <!-- Main Header with FDI logo and icons (match home header) -->
+        <div class="bg-[#1d2686] text-white flex items-center justify-between w-full px-4 py-2">
+            <div class="flex items-center gap-4">
+                 <a href="{% url 'home' %}" class="font-semibold text-xl cursor-pointer hover:opacity-80 transition-opacity">FDI</a>
+            </div>
+            
+            <div class="profile-menu-container" id="profileMenuContainer">
+                <div class="profile-avatar">{% if employer %}
+                  {{ employer.first_name|slice:":1" }}{{ employer.last_name|slice:":1" }}
+               {% else %}
+                   G
+               {% endif %}
+        </div>
+            <!-- <i class="fas fa-question-circle profile-help-icon" id="helpIcon"></i> -->
+ 
+            <div class="profile-dropdown" id="profileDropdown">
+                <div class="profile-dropdown-header">
+                    {% if employer %}
+                        <span>{{ employer.first_name }}</span><br>
+                        <small>{{ employer.email }}</small><br>
+                        <small>{{ employer.organization_name }}</small>
+                    {% else %}
+                        <span>Guest</span><br>
+                        <small>Not Logged In</small>
+                    {% endif %}
+                </div>
+                    <a href="/company-profile/" class="profile-dropdown-item">
+                        <i class="fas fa-building"></i> Company Profile
+                    </a>
+                    <a href="/team-members/" class="profile-dropdown-item">
+                        <i class="fas fa-users"></i> Team Members
+                    </a>
+                    <a href="#" class="profile-dropdown-item">
+                        <i class="fas fa-envelope"></i> Email Templates
+                    </a>
+                    <a href="/question-library/" class="profile-dropdown-item">
+                        <i class="fas fa-question-circle"></i> Connect Question Library
+                    </a>
+                    <a href="#" class="profile-dropdown-item">
+                        <i class="fas fa-chart-bar"></i> Plan Usage
+                    </a>
+                    <a href="/setting/" class="profile-dropdown-item">
+                        <i class="fas fa-cog"></i> Setting Options
+                    </a>
+                    <a href="#" class="profile-dropdown-item">
+                        <i class="fas fa-user-circle"></i> My Account
+                    </a>
+                    <a href="/logout/" class="profile-dropdown-item">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+
+        </div>
+        <!-- Secondary Header -->
+        <div class="bg-white shadow-md flex items-center justify-between px-8 py-3 h-[40px]">
+            <!-- Left side: Breadcrumbs -->
+            <div class="flex items-center gap-2 text-sm">
+                <a href="{% url 'classic_question_type' %}" class="breadcrumb-item hover:text-gray-800">Back</a>
+                <span class="text-gray-400">&gt;</span>
+                <a href="#" class="breadcrumb-item hover:text-gray-800">SUMMARY</a>
+                <span class="text-gray-400">&gt;</span>
+                <a href="#" class="breadcrumb-item active">QUESTION</a>
+                
+                <span class="text-gray-400">&gt;</span>
+                <a href="#" class="breadcrumb-item hover:text-gray-800">INVITE OPTIONS</a>
+            </div>
+
+            <!-- Right side: Actions -->
+            
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="view-initial-choice" class="content-container">
+        <div class="w-full max-w-4xl mx-auto">
+            <h1 class="text-3xl font-bold text-gray-800 mb-4">CODING ASSESSMENT</h1>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <a href="{% url 'coding_question_creation' %}" class="block p-8 bg-blue-50 rounded-xl hover:bg-blue-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                    <div class="text-blue-600 mb-4"><i class="fas fa-pencil-alt fa-3x"></i></div>
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-2">Manual</h2>
+                    <p class="text-gray-500">Create a new coding question from scratch.</p>
+                </a>
+                <a href="{% url 'coding_difficulty_levels' %}" id="automaticBtn" class="block p-8 bg-green-50 rounded-xl hover:bg-green-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer">
+                    <div class="text-green-600 mb-4"><i class="fas fa-tasks fa-3x"></i></div>
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-2">Automatic</h2>
+                    <p class="text-gray-500">Select questions from your question library.</p>
+                </a>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            const profileMenuContainer = document.getElementById('profileMenuContainer');
+            const profileDropdown = document.getElementById('profileDropdown');
+            const helpIcon = document.getElementById('helpIcon');
+            if (profileMenuContainer) {
+                profileMenuContainer.addEventListener('click', function(event) {
+                    if (event.target === helpIcon || (helpIcon && helpIcon.contains(event.target))) {
+                        event.stopPropagation();
+                    } else {
+                        event.stopPropagation();
+                        if (profileDropdown) profileDropdown.classList.toggle('show');
+                    }
+                });
+            }
+            document.addEventListener('click', function(event) {
+                if (profileMenuContainer && !profileMenuContainer.contains(event.target)) {
+                    if (profileDropdown) profileDropdown.classList.remove('show');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+

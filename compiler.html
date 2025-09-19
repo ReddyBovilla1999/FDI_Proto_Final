@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FDI Assessment Platform</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Google Fonts: Inter & Fira Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400&display=swap" rel="stylesheet">
+
+    <!-- jsPDF library for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        /* General body styling */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Light gray background */
+        }
+        
+        /* Custom scrollbar for the question panel */
+        .panel-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .panel-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 10px;
+        }
+        .panel-scrollbar::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 10px;
+        }
+        .panel-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #aaa;
+        }
+
+        /* Custom scrollbar for editor and console areas */
+        .editor-console-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .editor-console-scrollbar::-webkit-scrollbar-track {
+            background: #2b3647;
+            border-radius: 10px;
+        }
+        .editor-console-scrollbar::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 10px;
+        }
+        .editor-console-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #718096;
+        }
+
+        /* Styling for active tabs */
+        .tab.active {
+            border-bottom: 2px solid #3b82f6;
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        .question-tab.active {
+            background-color: #eef2ff;
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        
+        /* Core Editor Styles */
+        .editor-wrapper {
+            display: flex;
+            overflow: hidden; 
+            position: relative;
+            background-color: #1f2937;
+            height: 100%;
+            border-radius: 0.5rem;
+        }
+
+        #line-numbers-container {
+            font-family: 'Fira Mono', monospace;
+            font-size: 0.95rem;
+            line-height: 1.5; 
+            text-align: right;
+            padding: 1rem 0.5rem; 
+            color: #6b7280;
+            background-color: #1f2937;
+            user-select: none;
+            border-right: 1px solid #374151;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        #line-numbers-container .line-number-highlight {
+            color: #d1d5db;
+        }
+
+        #code-editor {
+            font-family: 'Fira Mono', monospace;
+            font-size: 0.95rem;
+            line-height: 1.5; 
+            padding: 1rem; 
+            color: #d1d5db;
+            background-color: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            width: 100%;
+            height: 100%;
+            white-space: pre;
+            overflow-wrap: normal;
+            overflow: auto;
+            z-index: 2;
+            position: relative;
+        }
+
+        #current-line-highlight {
+            position: absolute;
+            background-color: #2a313c;
+            pointer-events: none;
+            z-index: 0;
+            transition: top 0.05s ease-out;
+        }
+
+        /* Tab content display settings */
+        .tab-content { display: none; }
+        .tab-content.active { display: flex; flex-direction: column; height: 100%; }
+        
+        /* Console styling */
+        #console-output {
+            white-space: pre; /* Changed from pre-wrap to preserve table formatting */
+            word-break: normal; /* Accompanying change for 'pre' */
+        }
+        .brand-title {
+            background-color: #1d2686;
+            font-size: 20px;
+            padding: 10px 12px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Header Section -->
+    <header class="bg-white shadow-sm flex flex-col gap-1 flex-shrink-0">
+            <div style=""class="brand-title flex justify-between items-center px-1">
+                <h1 class="text-xl font-bold text-white ml-2">FDI</h1>
+                <div class="flex items-center gap-4">
+                    <div id="timerDisplay" class="flex items-center gap-2 text-white text-gray-700 font-semibold text-lg">
+                        <i class="fa-regular fa-clock"></i>
+                        <span>00:00:00</span>
+                    </div>
+                    <button id="submitCodeBtn" class="bg-green-600 text-white text-sm font-semibold px-3 py-1.5 rounded-md hover:bg-green-700 transition-colors">Submit</button>
+                </div>
+            </div>
+        </header>
+        <div class="flex justify-between items-center border-t border-gray-200 pt-1 px-1">
+            <!-- Content Tabs moved to header -->
+            <div class="flex items-center gap-6">
+                 <button class="tab active text-sm pb-1" data-tab="questionBank">Question</button>
+                 <button class="tab text-sm text-gray-500 hover:text-gray-800 pb-1" data-tab="schema">Schema</button>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <select id="languageSelect" class="appearance-none bg-gray-100 border border-gray-300 rounded-md py-1 pl-3 pr-8 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        <!-- Options will be populated by JS -->
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none"></i>
+                </div>
+                <button id="runAllTestsBtn" class="bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1 rounded-md hover:bg-gray-300 transition-colors cursor-not-allowed" disabled title="This feature is not yet enabled.">Run All Test Cases</button>
+                <button id="runCodeBtn" class="bg-blue-600 text-white text-sm font-semibold px-3 py-1 rounded-md hover:bg-blue-700 transition-colors">Run Code</button>
+            </div>
+        </div>
+
+    <!-- Main Content -->
+    <main id="main-content" class="flex-grow flex gap-2 overflow-hidden p-2 relative">
+        <!-- Left Panel: Questions/Schema -->
+        <div id="left-panel" class="bg-white rounded-lg shadow-sm p-4 flex flex-col overflow-hidden" style="width: 35%;">
+            <!-- Question Tabs -->
+            <div id="question-tabs-container" class="flex-shrink-0 border-b border-gray-200 flex">
+                <!-- Dynamically generated question tabs will appear here -->
+            </div>
+            
+            <div class="flex-grow overflow-hidden relative pt-2">
+                <div id="questionBank" class="tab-content active panel-scrollbar overflow-y-auto absolute inset-0">
+                    <h2 id="question-title" class="text-lg font-bold mb-2 text-gray-800"></h2>
+                    <div id="question-description" class="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap"></div>
+                    
+                    <!-- Hint Container -->
+                    <div id="hint-container" class="mt-6 pt-4 border-t border-gray-200" style="display: none;">
+                        <!-- Hint will be rendered here by JS -->
+                    </div>
+
+                    <!-- Test Cases for the current question -->
+                    <div id="question-test-cases" class="mt-4 pt-4 border-t border-gray-200">
+                        <h3 class="text-md font-semibold mb-2 text-gray-700">Test Cases</h3>
+                        <div id="testCaseContainer" class="space-y-3">
+                            <!-- Test cases will be rendered here by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <div id="schema" class="tab-content panel-scrollbar overflow-y-auto absolute inset-0">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Database Schema</h3>
+                        <button id="refreshSchemaBtn" class="text-blue-500 hover:text-blue-400"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    </div>
+                    <div id="schemaContainer" class="space-y-4"><p class="text-gray-500">Schema will appear here for SQL.</p></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Code Editor and Console -->
+        <div id="right-panel" class="flex flex-col overflow-hidden" style="width: 65%;">
+            <!-- Code Editor Section -->
+            <div id="editor-container" class="flex flex-col overflow-hidden flex-shrink-0" style="height: 65%;">
+                <div class="flex-grow editor-wrapper relative">
+                    <div id="current-line-highlight"></div>
+                    <div id="line-numbers-container"></div>
+                    <textarea id="code-editor" class="editor-console-scrollbar" spellcheck="false"></textarea>
+                </div>
+            </div>
+            
+            <!-- Draggable Resizer -->
+            <div id="horizontal-resizer" class="h-2 bg-transparent cursor-row-resize flex-shrink-0"></div>
+
+            <!-- Console/Output Section -->
+            <div id="console-container" class="flex flex-col flex-grow bg-gray-900 rounded-lg p-3" style="min-height: 0;">
+                <label class="block text-xs font-semibold text-gray-400 mb-2 flex-shrink-0">Console / Output</label>
+                <div id="console-output" class="w-full text-white font-mono text-sm overflow-y-auto overflow-x-auto editor-console-scrollbar flex-grow"></div>
+                <!-- Interactive Input -->
+                <div id="interactive-input-container" class="mt-2 flex-shrink-0" style="display: none;">
+                    <input id="interactive-input" type="text" class="w-full rounded bg-gray-800 text-gray-200 p-2 font-mono text-sm border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" autocomplete="off" placeholder="Enter input here...">
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Popup Modal -->
+    <div id="popupModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-8 shadow-xl text-center max-w-sm">
+            <span id="popupMessage" class="text-lg font-semibold text-gray-800"></span>
+            <button id="popupOkBtn" class="bg-blue-600 text-white px-6 py-2 rounded-md mt-6 mx-auto block font-semibold hover:bg-blue-700">OK</button>
+        </div>
+    </div>
+
+    <script>
+        
+        let cumulativeConsoleOutput = "";
+
+        // --- LANGUAGE DEFINITIONS ---
+        const languages = {
+            "c": { name: "C (GCC 9.2.0)", demoCode: `#include <stdio.h>\n\nint main() {\n    int a, b;\n    printf("Enter first number: ");\n    fflush(stdout);\n    scanf("%d", &a);\n    printf("Enter second number: ");\n    fflush(stdout);\n    scanf("%d", &b);\n    printf("Sum: %d\\n", a + b);\n    return 0;\n}` },
+            "cpp": { name: "C++ (GCC 9.2.0)", demoCode: `#include <iostream>\n\nint main() {\n    int a, b;\n    std::cout << "Enter first number: " << std::flush;\n    std::cin >> a;\n    std::cout << "Enter second number: " << std::flush;\n    std::cin >> b;\n    std::cout << "Sum: " << a + b << std::endl;\n    return 0;\n}` },
+            "java11": { name: "Java (JDK 11.0.4)", demoCode: `import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner scanner = new Scanner(System.in);\n        System.out.print("Enter your name: ");\n        String name = scanner.nextLine();\n        System.out.println("Hello, " + name + "!");\n    }\n}` },
+            "python3": { name: "Python (3.8.1)", demoCode: `print("Line 1")\nprint("Line 2")\na = input("Enter something for line 3: ")\nprint(f"You entered: {a}")` },
+            "sql": { name: "SQL (SQLite 3.27.2)", demoCode: `SELECT * FROM Employees;` },
+            "javascript": { name: "JavaScript (Node.js 12.14.0)", demoCode: `// This example uses the 'readline' module for interactive input.\nconst readline = require('readline');\n\nconst rl = readline.createInterface({\n  input: process.stdin,\n  output: process.stdout\n});\n\nrl.question('What is your favorite food? ', (answer) => {\n  console.log(\`Oh, so your favorite food is \${answer}\`);\n  rl.close();\n});` },
+            "php": { name: "PHP (7.4.1)", demoCode: `<?php\n\necho "What's your name? ";\n$name = fgets(STDIN);\necho "Hello, " . $name;\n\n?>` },
+            "typescript": { name: "TypeScript (3.7.4)", demoCode: `// This example uses the 'readline' module for interactive input.\nimport * as readline from 'readline';\n\nconst rl = readline.createInterface({ input: process.stdin, output: process.stdout });\n\nrl.question('Enter something: ', (input) => {\n    console.log(\`You wrote: \${input}\`);\n    rl.close();\n});` }
+        };
+
+        const allLanguages = {
+            ...languages,
+            "java8": { name: "Java 8 (OpenJDK 1.8.0)", demoCode: `import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner scanner = new Scanner(System.in);\n        System.out.print("Enter your name: ");\n        String name = scanner.nextLine();\n        System.out.println("Hello, " + name + "!");\n    }\n}` },
+            "python27": { name: "Python (2.7.17)", demoCode: `print "Line 1"\nprint "Line 2"\na = raw_input("Enter something for line 3: ")\nprint "You entered %s" % a` }
+        };
+
+        // Questions will be loaded from Django assessment API
+        let questionsData = {};
+
+        // --- DOM ELEMENTS ---
+        const languageSelect = document.getElementById('languageSelect');
+        const codeEditor = document.getElementById('code-editor');
+        const lineNumbersContainer = document.getElementById('line-numbers-container');
+        const highlightElement = document.getElementById('current-line-highlight');
+        const runCodeBtn = document.getElementById('runCodeBtn');
+        const schemaContainer = document.getElementById('schemaContainer');
+        const refreshSchemaBtn = document.getElementById('refreshSchemaBtn');
+        const questionTabsContainer = document.getElementById('question-tabs-container');
+        const questionTitleEl = document.getElementById('question-title');
+        const questionDescriptionEl = document.getElementById('question-description');
+        const testCaseContainerEl = document.getElementById('testCaseContainer');
+        const hintContainerEl = document.getElementById('hint-container');
+        
+        const consoleOutput = document.getElementById('console-output');
+        const interactiveInputContainer = document.getElementById('interactive-input-container');
+        const interactiveInput = document.getElementById('interactive-input');
+        const consoleContainer = document.getElementById('console-container');
+
+        // --- STATE ---
+        let currentLanguageKey = null;
+        let timerInterval = null;
+        let currentSessionId = null;
+        let pollInterval = null;
+        let isAwaitingInput = false;
+        let lastOutputTime = null;
+
+
+        // Use Node compiler_service backend for execution
+        const backendUrl = 'http://127.0.0.1:3001';
+
+
+        // --- UTILITY & PREPARATION FUNCTIONS ---
+        function escapeHtml(text) {
+            if (typeof text !== 'string') return text;
+            const div = document.createElement('div');
+            div.innerText = text;
+            return div.innerHTML;
+        }
+
+        function adjustSelectWidth(selectElement) {
+            const tempSpan = document.createElement('span');
+            document.body.appendChild(tempSpan);
+            const selectedOptionText = selectElement.options[selectElement.selectedIndex].text;
+            const selectStyle = window.getComputedStyle(selectElement);
+            tempSpan.style.font = selectStyle.font;
+            tempSpan.style.fontSize = selectStyle.fontSize;
+            tempSpan.style.fontWeight = selectStyle.fontWeight;
+            tempSpan.style.fontFamily = selectStyle.fontFamily;
+            tempSpan.style.letterSpacing = selectStyle.letterSpacing;
+            tempSpan.textContent = selectedOptionText;
+            tempSpan.style.visibility = 'hidden';
+            tempSpan.style.position = 'absolute';
+            tempSpan.style.whiteSpace = 'nowrap';
+            const padding = 32; // ~2rem for pl-3, pr-8 and buffer
+            const width = Math.ceil(tempSpan.getBoundingClientRect().width) + padding;
+            selectElement.style.width = `${width}px`;
+            document.body.removeChild(tempSpan);
+        }
+
+        function updateLineNumbers() {
+            const lineCount = codeEditor.value.split('\n').length;
+            lineNumbersContainer.innerHTML = Array.from({ length: lineCount }, (_, i) => `<div>${i + 1}</div>`).join('');
+            updateHighlight();
+        }
+
+        function updateHighlight() {
+            const styles = window.getComputedStyle(codeEditor);
+            const lineHeight = parseFloat(styles.lineHeight);
+            const paddingTop = parseFloat(styles.paddingTop);
+            const textUpToCursor = codeEditor.value.substring(0, codeEditor.selectionStart);
+            const currentLineIndex = textUpToCursor.split('\n').length - 1;
+            const topPosition = (currentLineIndex * lineHeight) + paddingTop - codeEditor.scrollTop;
+            const leftPosition = lineNumbersContainer.offsetWidth;
+            highlightElement.style.top = `${topPosition}px`;
+            highlightElement.style.left = `${leftPosition}px`;
+            highlightElement.style.height = `${lineHeight}px`;
+            highlightElement.style.width = `calc(100% - ${leftPosition}px)`;
+            const allLineNumbers = lineNumbersContainer.querySelectorAll('div');
+            allLineNumbers.forEach(num => num.classList.remove('line-number-highlight'));
+            if (allLineNumbers[currentLineIndex]) {
+                allLineNumbers[currentLineIndex].classList.add('line-number-highlight');
+            }
+        }
+        
+        function updateSchemaTabVisibility() {
+            const schemaTabBtn = document.querySelector('.tab[data-tab="schema"]');
+            schemaTabBtn.style.display = currentLanguageKey === 'sql' ? 'flex' : 'none';
+            if (currentLanguageKey !== 'sql' && schemaTabBtn.classList.contains('active')) {
+                document.querySelector('.tab[data-tab="questionBank"]').click();
+            }
+        }
+
+        function handleLanguageChange() {
+            currentLanguageKey = languageSelect.value;
+            const isLanguageSelected = !!currentLanguageKey;
+
+            codeEditor.disabled = !isLanguageSelected;
+            runCodeBtn.disabled = !isLanguageSelected;
+
+            if (isLanguageSelected) {
+                codeEditor.value = allLanguages[currentLanguageKey].demoCode;
+                if(currentLanguageKey === 'sql') {
+                    loadSchema();
+                }
+            } else {
+                codeEditor.value = ""; // Clear editor if no language is selected
+            }
+            
+            updateLineNumbers();
+            updateSchemaTabVisibility();
+            adjustSelectWidth(languageSelect); // Adjust width on change
+        }
+
+        function populateLanguageDropdown() {
+            let optionsHtml = '<option value="" disabled selected>- Select Language -</option>';
+            
+            // Check if current question has specific allowed languages
+            const currentQuestionLanguages = window.currentQuestionAllowedLanguages;
+            const globalAllowedLanguages = window.allowedLanguages || [];
+            
+            let languagesToShow = [];
+            
+            if (currentQuestionLanguages && currentQuestionLanguages.length > 0) {
+                // Use current question's allowed languages
+                languagesToShow = currentQuestionLanguages;
+            } else if (globalAllowedLanguages.length > 0) {
+                // Use global allowed languages
+                languagesToShow = globalAllowedLanguages;
+            } else {
+                // If no allowed languages are specified, show all languages
+                languagesToShow = Object.keys(allLanguages);
+            }
+            
+            // Populate dropdown with filtered languages
+            languagesToShow.forEach(langKey => {
+                if (allLanguages[langKey]) {
+                    optionsHtml += `<option value="${langKey}">${allLanguages[langKey].name}</option>`;
+                }
+            });
+            
+            console.log('DEBUG: Languages to show in dropdown:', languagesToShow);
+            languageSelect.innerHTML = optionsHtml;
+        }
+        
+        // --- QUESTION LOADING & TIMER ---
+        function generateQuestionTabs() {
+            let tabsHtml = '';
+            const totalQuestions = Object.keys(questionsData).length;
+            const showNumbering = totalQuestions > 1;
+            
+            Object.keys(questionsData).forEach(id => {
+                const tabText = showNumbering ? `Question ${id}` : 'Question';
+                tabsHtml += `<button class="question-tab flex-1 text-center text-sm p-2 text-gray-500 rounded-t-lg" data-question-id="${id}">${tabText}</button>`;
+            });
+            questionTabsContainer.innerHTML = tabsHtml;
+            
+            const questionTabs = document.querySelectorAll('.question-tab');
+            questionTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    questionTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    loadQuestion(tab.dataset.questionId);
+                });
+            });
+
+            if(questionTabs.length > 0) {
+                questionTabs[0].classList.add('active');
+            }
+        }
+
+        function loadQuestion(questionId) {
+            console.log(`DEBUG: Loading question ${questionId}`);
+            console.log(`DEBUG: Available questions:`, Object.keys(questionsData));
+            const data = questionsData[questionId];
+            if (!data) {
+                console.log(`DEBUG: No data found for question ${questionId}`);
+                return;
+            }
+
+            console.log(`DEBUG: Question data:`, data);
+            
+            // Update question title with proper numbering
+            const totalQuestions = Object.keys(questionsData).length;
+            const showNumbering = totalQuestions > 1;
+            const questionTitle = showNumbering ? `Question ${questionId}` : 'Question';
+            console.log(`DEBUG: Total questions: ${totalQuestions}, Show numbering: ${showNumbering}, Title: ${questionTitle}`);
+            questionTitleEl.textContent = questionTitle;
+            
+            questionDescriptionEl.innerHTML = data.description.replace(/`([^`]+)`/g, '<code class="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-sm">$1</code>');
+            renderHint(data.hint);
+            renderTestCases(data.testCases);
+
+            // Update allowed languages for this specific question
+            if (data.allowed_languages && data.allowed_languages.length > 0) {
+                window.currentQuestionAllowedLanguages = data.allowed_languages;
+                console.log('DEBUG: Current question allowed languages:', data.allowed_languages);
+                populateLanguageDropdown();
+                adjustSelectWidth(languageSelect);
+            } else {
+                // Clear current question languages if none specified
+                window.currentQuestionAllowedLanguages = null;
+                console.log('DEBUG: No specific languages for this question, using global allowed languages');
+                populateLanguageDropdown();
+                adjustSelectWidth(languageSelect);
+            }
+
+            // Show/hide Run All Test Cases button
+            const runAllBtn = document.getElementById('runAllTestsBtn');
+            console.log("DEBUG: Test cases for current question:", data.testCases);
+            console.log("DEBUG: Test cases length:", data.testCases ? data.testCases.length : 0);
+            if (data.testCases && data.testCases.length > 0) {
+                console.log("DEBUG: Showing Run All Test Cases button");
+                runAllBtn.style.display = '';
+                runAllBtn.disabled = false;
+                runAllBtn.classList.remove('cursor-not-allowed');
+                runAllBtn.title = "Run all test cases for this question";
+            } else {
+                console.log("DEBUG: Hiding Run All Test Cases button - no test cases");
+                runAllBtn.style.display = 'none';
+            }
+        }
+
+        function renderHint(hintText) {
+            hintContainerEl.innerHTML = ""; // Clear previous hint
+            if (!hintText) {
+                hintContainerEl.style.display = 'none';
+                return;
+            }
+
+            hintContainerEl.style.display = 'block';
+            hintContainerEl.innerHTML = `
+                <button id="showHintBtn" class="bg-yellow-100 text-yellow-800 text-sm font-semibold px-3 py-1.5 rounded-md hover:bg-yellow-200 transition-colors">
+                    <i class="fa-regular fa-lightbulb mr-2"></i>Show Hint
+                </button>
+                <div id="hint-content" class="hidden mt-2 p-3 bg-gray-50 border rounded-md text-sm text-gray-600">
+                    ${escapeHtml(hintText)}
+                </div>
+            `;
+
+            document.getElementById('showHintBtn').addEventListener('click', () => {
+                const hintContent = document.getElementById('hint-content');
+                hintContent.classList.toggle('hidden');
+            });
+        }
+
+        function renderTestCases(testCases) {
+            const testCasesSection = document.getElementById('question-test-cases');
+            
+            if (!testCases || testCases.length === 0) {
+                // Hide the entire test cases section if no test cases
+                console.log('DEBUG: No test cases, hiding test cases section');
+                testCasesSection.style.display = 'none';
+                return;
+            }
+            
+            // Show the test cases section
+            testCasesSection.style.display = 'block';
+            console.log(`DEBUG: Showing ${testCases.length} test cases`);
+            
+            let html = "";
+            const totalQuestions = Object.keys(questionsData).length;
+            const showNumbering = totalQuestions > 1;
+            console.log(`DEBUG: Test cases numbering - Total questions: ${totalQuestions}, Show numbering: ${showNumbering}`);
+            
+            testCases.forEach((tc, idx) => {
+                const testCaseNumber = showNumbering ? `Test Case ${idx + 1}` : `Test Case`;
+                html += `
+                <div class="bg-gray-50 p-3 rounded-md border border-gray-200 w-full"> 
+                    <div class="font-bold mb-2 text-gray-700">${testCaseNumber}</div>
+                    <div class="mb-2">
+                        <span class="block text-xs text-gray-500 font-semibold">Input:</span>
+                        <pre class="w-full bg-gray-200 text-gray-800 rounded p-2 text-sm mt-1">${escapeHtml(tc.input)}</pre>
+                    </div>
+                    <div>
+                        <span class="block text-xs text-gray-500 font-semibold">Expected Output:</span>
+                        <pre class="w-full bg-gray-200 text-gray-800 rounded p-2 text-sm mt-1">${escapeHtml(tc.expected_output)}</pre>
+                    </div>
+                </div>`;
+            });
+            testCaseContainerEl.innerHTML = html;
+        }
+
+        function formatTime(sec) {
+            const h = String(Math.floor(sec / 3600)).padStart(2, '0');
+            const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+            const s = String(sec % 60).padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        function parseTimeToSeconds(timeStr) {
+            // Accepts "00:10:00" or "10:00" or "600"
+            if (!timeStr) return 0;
+            if (/^\d+$/.test(timeStr)) return parseInt(timeStr, 10); // seconds
+            const parts = timeStr.split(':').map(Number);
+            if (parts.length === 3) {
+                return parts[0] * 3600 + parts[1] * 60 + parts[2];
+            } else if (parts.length === 2) {
+                return parts[0] * 60 + parts[1];
+            }
+            return 0;
+        }
+
+        function startCountdownTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            const timerDisplay = document.querySelector('#timerDisplay span');
+
+            // Calculate total time from all questions
+            let totalSeconds = 0;
+            Object.values(questionsData).forEach(q => {
+                totalSeconds += parseTimeToSeconds(q?.time_limit || q?.time_to_answer || "00:10:00");
+            });
+            if (!totalSeconds) totalSeconds = 600; // fallback 10 min
+
+            timerDisplay.textContent = formatTime(totalSeconds);
+
+            timerInterval = setInterval(() => {
+                totalSeconds--;
+                timerDisplay.textContent = formatTime(totalSeconds);
+                if (totalSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    timerDisplay.textContent = "00:00:00";
+                    console.log('Timer ended - showing assessment submitted popup');
+                    showAssessmentSubmittedPopup();
+                }
+            }, 1000);
+        }
+        
+        function showPopup(message) {
+            const popupModal = document.getElementById('popupModal');
+            const popupMessage = document.getElementById('popupMessage');
+            const popupOkBtn = document.getElementById('popupOkBtn');
+            popupMessage.textContent = message;
+            popupModal.classList.remove('hidden');
+            popupOkBtn.onclick = () => popupModal.classList.add('hidden');
+        }
+
+        function showAssessmentSubmittedPopup(customMessage = null) {
+            const popupModal = document.getElementById('popupModal');
+            const popupMessage = document.getElementById('popupMessage');
+            const popupOkBtn = document.getElementById('popupOkBtn');
+            
+            // Disable all interactive elements
+            disableAssessmentInterface();
+            
+            // Update the popup message
+            const message = customMessage || "Assessment submitted successfully! Thank you for completing the assessment.";
+            popupMessage.textContent = message;
+            
+            // Show the popup
+            popupModal.classList.remove('hidden');
+            
+            // Update the OK button behavior to close the page
+            popupOkBtn.onclick = () => {
+                popupModal.classList.add('hidden');
+                // Close the current window/tab after a short delay
+                setTimeout(() => {
+                    // Try to close the window/tab
+                    if (window.opener) {
+                        // If opened in a popup, close it
+                        window.close();
+                    } else {
+                        // If opened directly, redirect to a thank you page or close
+                        // You can customize this URL based on your needs
+                        window.location.href = '/assessment-completed/';
+                    }
+                }, 500);
+            };
+            
+            // Auto-close after 5 seconds if user doesn't click OK
+            setTimeout(() => {
+                if (!popupModal.classList.contains('hidden')) {
+                    popupOkBtn.click();
+                }
+            }, 5000);
+        }
+
+        function disableAssessmentInterface() {
+            // Disable code editor
+            const codeEditor = document.getElementById('code-editor');
+            codeEditor.disabled = true;
+            codeEditor.style.opacity = '0.5';
+            
+            // Disable language selector
+            const languageSelect = document.getElementById('languageSelect');
+            languageSelect.disabled = true;
+            languageSelect.style.opacity = '0.5';
+            
+            // Disable run buttons
+            const runCodeBtn = document.getElementById('runCodeBtn');
+            const runAllTestsBtn = document.getElementById('runAllTestsBtn');
+            const submitCodeBtn = document.getElementById('submitCodeBtn');
+            
+            runCodeBtn.disabled = true;
+            runCodeBtn.style.opacity = '0.5';
+            runAllTestsBtn.disabled = true;
+            runAllTestsBtn.style.opacity = '0.5';
+            submitCodeBtn.disabled = true;
+            submitCodeBtn.style.opacity = '0.5';
+            
+            // Disable question tabs
+            const questionTabs = document.querySelectorAll('.question-tab');
+            questionTabs.forEach(tab => {
+                tab.disabled = true;
+                tab.style.opacity = '0.5';
+                tab.style.pointerEvents = 'none';
+            });
+            
+            // Clear any running timers
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            
+            console.log('Assessment interface disabled - timer ended or submitted');
+        }
+
+        async function submitAssessmentToServer() {
+            try {
+                // Get current question data
+                const activeTab = document.querySelector('.question-tab.active');
+                const currentQuestion = activeTab ? questionsData[activeTab.dataset.questionId] : null;
+                
+                if (!currentQuestion) {
+                    console.error('No active question found');
+                    return false;
+                }
+                
+                // Get assessment ID from URL or global variable
+                const assessmentId = window.assessmentId || getAssessmentIdFromUrl();
+                if (!assessmentId) {
+                    console.error('Assessment ID not found');
+                    return false;
+                }
+                
+                // Get code and output
+                const codeContent = codeEditor.value || 'No code written';
+                const consoleContent = consoleOutput.textContent || 'No output generated';
+                const selectedLanguage = languageSelect.value || 'Unknown';
+                
+                // Calculate time taken (if timer is available)
+                const timeTaken = calculateTimeTaken();
+                
+                // Prepare submission data
+                const submissionData = {
+                    assessment_id: parseInt(assessmentId),
+                    question_id: parseInt(currentQuestion.id),
+                    candidate_name: 'Candidate', // You can modify this to get from user input
+                    candidate_email: '', // You can modify this to get from user input
+                    language_used: selectedLanguage,
+                    code_submitted: codeContent,
+                    output_generated: consoleContent,
+                    time_taken: timeTaken
+                };
+                
+                console.log('Submitting assessment data:', submissionData);
+                
+                // Send to server
+                const response = await fetch('/assessment/api/submit-assessment/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(submissionData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    console.log('Assessment submitted successfully:', result);
+                    return true;
+                } else {
+                    console.error('Failed to submit assessment:', result.error);
+                    return false;
+                }
+                
+            } catch (error) {
+                console.error('Error submitting assessment:', error);
+                return false;
+            }
+        }
+        
+        function getAssessmentIdFromUrl() {
+            const pathParts = window.location.pathname.split('/');
+            const assessmentIndex = pathParts.indexOf('start');
+            if (assessmentIndex !== -1 && assessmentIndex + 1 < pathParts.length) {
+                return pathParts[assessmentIndex + 1];
+            }
+            return null;
+        }
+        
+        function calculateTimeTaken() {
+            // Calculate time taken based on timer
+            // This is a simple implementation - you can enhance it based on your timer logic
+            const timerDisplay = document.getElementById('timerDisplay');
+            if (timerDisplay) {
+                const timerText = timerDisplay.textContent.trim();
+                // Parse timer format (HH:MM:SS) and convert to seconds
+                const parts = timerText.split(':');
+                if (parts.length === 3) {
+                    const hours = parseInt(parts[0]) || 0;
+                    const minutes = parseInt(parts[1]) || 0;
+                    const seconds = parseInt(parts[2]) || 0;
+                    return hours * 3600 + minutes * 60 + seconds;
+                }
+            }
+            return 0;
+        }
+
+        // --- CORE EXECUTION LOGIC ---
+
+        function setRunningState(isRunning) {
+            if (isRunning) {
+                runCodeBtn.disabled = true;
+                runCodeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+                consoleOutput.textContent = ''; // Clear console on new run
+                cumulativeConsoleOutput = "";   // <-- Reset here
+                hideInteractiveInput();
+                isAwaitingInput = false;
+                lastOutputTime = Date.now();
+            } else {
+                runCodeBtn.disabled = false;
+                runCodeBtn.innerHTML = 'Run Code';
+                if (pollInterval) clearInterval(pollInterval);
+                pollInterval = null;
+                currentSessionId = null;
+            }
+        }
+
+        function appendToConsole(text, className = '') {
+            if (typeof text !== 'string') text = String(text);
+            const span = document.createElement('span');
+            if (className) span.className = className;
+            span.textContent = text;
+            consoleOutput.appendChild(span);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            cumulativeConsoleOutput += text; // Track all output for prompt detection
+        }
+
+        function showInteractiveInput() {
+            if (interactiveInputContainer.style.display === 'none') {
+                interactiveInputContainer.style.display = 'block';
+                interactiveInput.value = '';
+                interactiveInput.focus();
+                consoleContainer.scrollTop = consoleContainer.scrollHeight;
+            }
+        }
+
+        function hideInteractiveInput() {
+            interactiveInputContainer.style.display = 'none';
+        }
+
+        async function startExecution() {
+            setRunningState(true);
+            const code = codeEditor.value;
+            const language = languageSelect.value;
+
+            try {
+                const response = await fetch(`${backendUrl}/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ language, code })
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                     // Handle server-side validation errors (like forbidden SQL keywords)
+                    throw new Error(result.error || `HTTP error! status: ${response.status}`);
+                }
+                
+                if (result.sessionId) {
+                    currentSessionId = result.sessionId;
+                    pollInterval = setInterval(pollForResult, 150); // Poll frequently
+                } else {
+                    throw new Error("Did not receive a session ID.");
+                }
+            } catch (error) {
+                const detailedError = error.message.includes('forbidden') || error.message.includes('SELECT') 
+                    ? `Error: ${error.message}`
+                    : `Error: Connection to the execution server failed.\nPlease check your network connection or try again later.`;
+                appendToConsole(detailedError + '\n', 'text-red-400');
+                setRunningState(false);
+            }
+        }
+        
+        async function pollForResult() {
+            if (!currentSessionId) {
+                setRunningState(false);
+                hideInteractiveInput();
+                cumulativeConsoleOutput = "";
+                return;
+            }
+            try {
+                const response = await fetch(`${backendUrl}/poll/${currentSessionId}?t=${new Date().getTime()}`);
+                if (!response.ok) {
+                    appendToConsole("\nSession finished or expired.", "text-gray-500");
+                    setRunningState(false);
+                    hideInteractiveInput();
+                    cumulativeConsoleOutput = "";
+                    return;
+                }
+                const result = await response.json();
+
+                let lastOutput = "";
+                if (result.output) {
+                    appendToConsole(result.output);
+                    lastOutput = result.output;
+                    lastOutputTime = Date.now();
+                    isAwaitingInput = false;
+                }
+                if (result.error) {
+                    appendToConsole(result.error, 'text-red-400');
+                    lastOutputTime = Date.now();
+                    isAwaitingInput = false;
+                }
+
+                // --- Robust finish detection for JS/TS ---
+                if (
+                    result.status === 'finished' ||
+                    (
+                        (currentLanguageKey === 'javascript' || currentLanguageKey === 'typescript') &&
+                        result.isStillRunning === false
+                    )
+                ) {
+                    setRunningState(false);
+                    hideInteractiveInput();
+                    cumulativeConsoleOutput = "";
+                    return;
+                }
+
+                // --- Input box logic ---
+                let shouldShowInput = false;
+                if (result.isStillRunning) {
+                    if (currentLanguageKey === 'javascript' || currentLanguageKey === 'typescript') {
+                        const promptRegex = /(\?\s*|:\s*|>\s*)$/m;
+                        shouldShowInput = promptRegex.test(cumulativeConsoleOutput);
+                    } else {
+                        const timeSince = Date.now() - lastOutputTime;
+                        const threshold = 400;
+                        shouldShowInput = timeSince > threshold;
+                    }
+                }
+                if (shouldShowInput) {
+                    showInteractiveInput();
+                    isAwaitingInput = true;
+                } else {
+                    hideInteractiveInput();
+                    isAwaitingInput = false;
+                }
+            } catch (error) {
+                let detailedError = `\nPolling Error: ${error.message}`;
+                if (error.message.includes('Failed to fetch')) {
+                    detailedError = `\nError: Lost connection to the execution server.`;
+                }
+                appendToConsole(detailedError + '\n', 'text-red-400');
+                setRunningState(false);
+                hideInteractiveInput();
+                cumulativeConsoleOutput = "";
+            }
+        }
+
+        async function sendInputToBackend(input) {
+            if (!currentSessionId) return;
+            
+            // Hide the input box immediately for a better UX
+            hideInteractiveInput();
+            appendToConsole(`${input}\n`, 'text-gray-500'); // Echo the input
+            
+            isAwaitingInput = false;
+            lastOutputTime = Date.now(); // Reset the timer
+
+            try {
+                await fetch(`${backendUrl}/submit-input`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: currentSessionId, input }),
+                });
+            } catch (error) {
+                appendToConsole(`\nError submitting input: ${error.message}`, 'text-red-400');
+                setRunningState(false);
+            }
+        }
+
+        async function loadSchema() {
+            schemaContainer.innerHTML = `<div class="flex items-center justify-center h-full"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i></div>`; // Loading spinner
+
+            try {
+                const response = await fetch(`${backendUrl}/schema`);
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+                const schema = await response.json();
+                
+                let schemaHtml = '';
+                const tableNames = Object.keys(schema);
+
+                if (tableNames.length === 0) {
+                    schemaContainer.innerHTML = '<p class="text-gray-500">No tables found in the database.</p>';
+                    return;
+                }
+
+                tableNames.forEach(tableName => {
+                    const columns = schema[tableName];
+                    schemaHtml += `
+                        <div class="bg-gray-100 p-3 rounded-md border">
+                            <h4 class="font-bold text-md text-blue-600">${tableName}</h4>
+                            <table class="w-full text-left text-sm mt-2">
+                                <thead class="bg-gray-200">
+                                    <tr>
+                                        <th class="p-2 font-semibold">Column</th>
+                                        <th class="p-2 font-semibold">Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${columns.map(col => `
+                                        <tr class="border-t">
+                                            <td class="p-2">${escapeHtml(col.name)}</td>
+                                            <td class="p-2 text-gray-600">${escapeHtml(col.type)}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                });
+                schemaContainer.innerHTML = schemaHtml;
+
+            } catch (error) {
+                console.error("Failed to load schema:", error);
+                schemaContainer.innerHTML = `<p class="text-red-500">Error loading schema. Please try again.</p>`;
+            }
+        }
+
+        function loadAssessmentFromDjango() {
+            // Load real assessment data from Django template context
+            questionTabsContainer.innerHTML = '';
+            questionTitleEl.textContent = 'Loading...';
+            questionDescriptionEl.textContent = '';
+            testCaseContainerEl.innerHTML = '';
+            hintContainerEl.style.display = 'none';
+
+            try {
+                // Get assessment data from Django template context
+                const data = JSON.parse('{{ questions_json|escapejs }}');
+                
+                questionTitleEl.textContent = '';
+                questionsData = {};
+                
+                // Collect all allowed languages from all questions
+                let allAllowedLanguages = new Set();
+                
+                if (!data || data.length === 0) {
+                    questionTitleEl.textContent = 'No Questions';
+                    questionDescriptionEl.textContent = 'There are no questions for this assessment.';
+                    return;
+                }
+
+                data.forEach((q, idx) => {
+                    const questionIndex = idx + 1;
+                    
+                    // Collect allowed languages for this question
+                    if (q.allowed_languages && Array.isArray(q.allowed_languages)) {
+                        q.allowed_languages.forEach(lang => allAllowedLanguages.add(lang));
+                    }
+                    
+                    questionsData[questionIndex] = {
+                        id: q.id,
+                        title: q.title,
+                        description: q.description,
+                        hint: q.hint || null,
+                        time_limit: parseTimeToSeconds(q.time_to_answer),
+                        allowed_languages: q.allowed_languages || [],
+                        code_stubs: q.code_stubs || {},
+                        testCases: (q.test_cases || []).map(t => ({ 
+                            input: t.input || '', 
+                            expected_output: t.expected_output || ''
+                        }))
+                    };
+                });
+                
+                // Store allowed languages globally for language filtering
+                window.allowedLanguages = Array.from(allAllowedLanguages);
+                console.log('DEBUG: Allowed languages from assessment:', window.allowedLanguages);
+                
+                generateQuestionTabs();
+                loadQuestion(1);
+                startCountdownTimer();
+            } catch (e) {
+                console.error("Failed to load assessment:", e);
+                questionTitleEl.textContent = 'Error Loading Assessment';
+                questionDescriptionEl.innerHTML = `There was a problem loading the assessment data.`;
+            }
+        }
+        
+        // --- [NEW] This function handles running code against all test cases ---
+        async function runAndTestCode() {
+            const activeTab = document.querySelector('.question-tab.active');
+            if (!activeTab) {
+                showPopup("Please select a question first.");
+                return;
+            }
+
+            const qId = activeTab.dataset.questionId;
+            const data = questionsData[qId];
+
+            if (!data || !data.testCases || data.testCases.length === 0) {
+                showPopup("No test cases available for this question.");
+                return;
+            }
+
+            const runAllBtn = document.getElementById('runAllTestsBtn');
+            const originalRunAllText = runAllBtn.innerHTML;
+
+            // Set buttons to a running state
+            runAllBtn.disabled = true;
+            runCodeBtn.disabled = true;
+            const runningHtml = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+            runAllBtn.innerHTML = runningHtml;
+            
+            consoleOutput.innerHTML = ''; // Clear console for results
+
+            let passedCount = 0;
+            let results = [];
+            const totalQuestions = Object.keys(questionsData).length;
+            const showNumbering = totalQuestions > 1;
+            
+            for (let i = 0; i < data.testCases.length; i++) {
+                const tc = data.testCases[i];
+                const testCaseNumber = showNumbering ? `Test Case ${i + 1}` : 'Test Case';
+                appendToConsole(`Running ${testCaseNumber}...\n`);
+                try {
+                    const output = await executeCodeWithInput(languageSelect.value, codeEditor.value, tc.input);
+                    const trimmedOutput = (output || '').trim();
+                    const expected = (tc.expected_output || '').trim();
+                    const success = trimmedOutput === expected;
+                    if (success) passedCount++;
+                    results.push({ input: tc.input, expected, output: trimmedOutput, success });
+                } catch (error) {
+                    results.push({
+                        input: tc.input,
+                        expected: tc.expected_output,
+                        output: `Execution Error: ${error.message}`,
+                        success: false
+                    });
+                }
+            }
+
+            // Restore buttons
+            runAllBtn.disabled = false;
+            runCodeBtn.disabled = false;
+            runAllBtn.innerHTML = originalRunAllText;
+            
+            // Display formatted results in the console
+            consoleOutput.innerHTML = '';
+            const summaryClass = passedCount === results.length ? 'text-green-400' : 'text-yellow-400';
+            appendToConsole(`Test Execution Summary: ${passedCount} / ${results.length} Test Cases Passed\n`, summaryClass + ' font-bold text-lg');
+            appendToConsole(`----------------------------------------\n\n`);
+
+            results.forEach((r, idx) => {
+                const statusClass = r.success ? 'text-green-400' : 'text-red-400';
+                const statusText = r.success ? '✅ Pass' : '❌ Fail';
+                const testCaseNumber = showNumbering ? `Test Case ${idx + 1}` : 'Test Case';
+                
+                appendToConsole(`${testCaseNumber}: ${statusText}\n`, statusClass + ' font-bold');
+                appendToConsole(`----------------------------------------\n`);
+                appendToConsole(`Input:\n`, 'text-gray-400');
+                appendToConsole(`${r.input || '(No Input)'}\n\n`);
+                appendToConsole(`Expected Output:\n`, 'text-gray-400');
+                appendToConsole(`${r.expected}\n\n`);
+                appendToConsole(`Your Output:\n`, 'text-gray-400');
+                appendToConsole(`${r.output}\n`);
+                appendToConsole(`----------------------------------------\n\n`);
+            });
+        }
+
+        // --- [NEW] Helper function to execute code and wait for completion ---
+        /**
+         * Executes code with given input and polls the backend until execution is finished.
+         * @param {string} language - The language key (e.g., 'python3').
+         * @param {string} code - The source code to execute.
+         * @param {string} input - The standard input to provide to the code.
+         * @returns {Promise<string>} A promise that resolves with the final stdout/stderr.
+         */
+        async function executeCodeWithInput(language, code, input) {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const startResponse = await fetch(`${backendUrl}/execute`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ language, code, input }) 
+                    });
+
+                    if (!startResponse.ok) {
+                        const errorResult = await startResponse.json();
+                        return reject(new Error(errorResult.error || `HTTP error! status: ${startResponse.status}`));
+                    }
+
+                    const startResult = await startResponse.json();
+                    
+                    if (!startResult.sessionId) {
+                        return resolve(startResult.output || startResult.error || "");
+                    }
+                    
+                    const sessionId = startResult.sessionId;
+                    let fullOutput = "";
+                    let pollCount = 0;
+                    const maxPolls = 100; // ~15 seconds timeout
+
+                    const pollIntervalId = setInterval(async () => {
+                        if (pollCount++ > maxPolls) {
+                            clearInterval(pollIntervalId);
+                            return reject(new Error("Execution timed out after 15 seconds."));
+                        }
+
+                        try {
+                            const pollResponse = await fetch(`${backendUrl}/poll/${sessionId}?t=${new Date().getTime()}`);
+                            if (!pollResponse.ok) {
+                                clearInterval(pollIntervalId);
+                                return resolve(fullOutput); 
+                            }
+
+                            const pollResult = await pollResponse.json();
+                            if (pollResult.output) fullOutput += pollResult.output;
+                            if (pollResult.error) fullOutput += pollResult.error;
+
+                            if (pollResult.status === 'finished' || pollResult.isStillRunning === false) {
+                                clearInterval(pollIntervalId);
+                                resolve(fullOutput);
+                            }
+
+                        } catch (pollError) {
+                            clearInterval(pollIntervalId);
+                            reject(pollError);
+                        }
+                    }, 150);
+
+                } catch (execError) {
+                    reject(execError);
+                }
+            });
+        }
+
+        // --- EVENT LISTENERS & INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load assessment data first to get allowed languages
+            loadAssessmentFromDjango();
+            
+            // Then populate language dropdown with filtered languages
+            populateLanguageDropdown();
+            adjustSelectWidth(languageSelect); // Set initial width for placeholder
+            handleLanguageChange();
+
+            codeEditor.addEventListener('input', updateLineNumbers);
+            codeEditor.addEventListener('scroll', () => { 
+                lineNumbersContainer.scrollTop = codeEditor.scrollTop;
+                updateHighlight();
+            });
+            codeEditor.addEventListener('click', updateHighlight);
+            codeEditor.addEventListener('keyup', updateHighlight);
+
+            languageSelect.addEventListener('change', handleLanguageChange);
+            refreshSchemaBtn.addEventListener('click', loadSchema);
+            runCodeBtn.addEventListener('click', startExecution); // This remains unchanged
+            document.getElementById('runAllTestsBtn').addEventListener('click', runAndTestCode); // This is the new functionality
+            
+            document.getElementById('submitCodeBtn').addEventListener('click', async () => {
+                // Submit assessment to server (PDF will be generated server-side)
+                const submitted = await submitAssessmentToServer();
+                
+                if (submitted) {
+                    // Show success message
+                    showAssessmentSubmittedPopup('Assessment submitted successfully! PDF has been saved to the database.');
+                } else {
+                    // Show popup even if submission failed
+                    showAssessmentSubmittedPopup('Assessment submitted successfully! (PDF generation failed)');
+                }
+            });
+            
+            interactiveInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && interactiveInput.value) {
+                    e.preventDefault();
+                    sendInputToBackend(interactiveInput.value);
+                }
+            });
+
+            const tabButtons = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    document.getElementById(button.dataset.tab)?.classList.add('active');
+                });
+            });
+
+            updateLineNumbers();
+            setTimeout(updateHighlight, 10);
+        });
+
+        // --- RESIZER LOGIC ---
+        const mainContent = document.getElementById('main-content');
+        const leftPanel = document.getElementById('left-panel');
+        const rightPanel = document.getElementById('right-panel');
+        const editorContainer = document.getElementById('editor-container');
+        const horizontalResizer = document.getElementById('horizontal-resizer');
+
+        let isResizingPanels = false;
+        let isResizingEditor = false;
+
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+
+        function onMouseDown(e) {
+            const leftPanelRect = leftPanel.getBoundingClientRect();
+            const resizeBorderSensitivity = 5;
+            if (e.clientX > leftPanelRect.right - resizeBorderSensitivity && e.clientX < leftPanelRect.right + resizeBorderSensitivity) {
+                isResizingPanels = true;
+                e.preventDefault();
+            }
+            
+            if (e.target === horizontalResizer) {
+                isResizingEditor = true;
+                e.preventDefault();
+            }
+            
+            if (isResizingPanels || isResizingEditor) {
+                document.body.style.userSelect = 'none';
+            }
+        }
+
+        function onMouseMove(e) {
+            if (isResizingPanels) {
+                document.body.style.cursor = 'col-resize';
+                const totalWidth = mainContent.offsetWidth;
+                const gap = parseInt(window.getComputedStyle(mainContent).gap);
+                const mouseX = e.clientX - mainContent.getBoundingClientRect().left;
+                let newLeftWidth = (mouseX / (totalWidth - gap)) * 100;
+                
+                if (newLeftWidth < 20) newLeftWidth = 20;
+                if (newLeftWidth > 60) newLeftWidth = 60;
+                
+                leftPanel.style.width = `${newLeftWidth}%`;
+                rightPanel.style.width = `${100 - newLeftWidth}%`;
+            } else if (isResizingEditor) {
+                document.body.style.cursor = 'row-resize';
+                const rightPanelRect = rightPanel.getBoundingClientRect();
+                const mouseY = e.clientY - rightPanelRect.top;
+                let newEditorHeight = mouseY;
+                const minEditorHeight = 100;
+                const minConsoleHeight = 80;
+                const resizerHeight = horizontalResizer.offsetHeight;
+
+                if (newEditorHeight < minEditorHeight) newEditorHeight = minEditorHeight;
+                if (newEditorHeight > rightPanelRect.height - minConsoleHeight - resizerHeight) newEditorHeight = rightPanelRect.height - minConsoleHeight - resizerHeight;
+
+                editorContainer.style.height = `${newEditorHeight}px`;
+            } else {
+                const leftPanelRect = leftPanel.getBoundingClientRect();
+                const resizeBorderSensitivity = 5;
+                const onPanelBorder = e.clientX > leftPanelRect.right - resizeBorderSensitivity && e.clientX < leftPanelRect.right + resizeBorderSensitivity;
+                
+                if (onPanelBorder) {
+                    document.body.style.cursor = 'col-resize';
+                } else if (e.target !== horizontalResizer) {
+                    document.body.style.cursor = 'default';
+                }
+            }
+        }
+
+        function onMouseUp() {
+            isResizingPanels = false;
+            isResizingEditor = false;
+            document.body.style.userSelect = '';
+            document.body.style.cursor = 'default';
+        }
+    </script>
+</body>
+</html>
